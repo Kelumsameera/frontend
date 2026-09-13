@@ -1,1 +1,21 @@
-node_modules
+# Dependencies and package installs
+node_modules/
+
+# Next.js build and generated output
+.next/
+out/
+.next-cache/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# OS and editor noise
+.DS_Store
+*.log
+npm-debug.log*
+.DS_Store
+
+# TypeScript build metadata
+*.tsbuildinfo
