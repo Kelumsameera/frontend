@@ -1,0 +1,8 @@
+{
+  "/water/page": "app/water/page.js",
+  "/pressure/page": "app/pressure/page.js",
+  "/database/page": "app/database/page.js",
+  "/chart/page": "app/chart/page.js",
+  "/history/page": "app/history/page.js",
+  "/waterdb/page": "app/waterdb/page.js"
+}
