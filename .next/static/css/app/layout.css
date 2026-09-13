@@ -636,8 +636,14 @@
   .bg-\(--sidebar\) {
     background-color: var(--sidebar);
   }
+  .bg-\(--sidebar\,\#0f172a\) {
+    background-color: var(--sidebar,#0f172a);
+  }
   .bg-\(--sidebar-active\) {
     background-color: var(--sidebar-active);
+  }
+  .bg-\(--sidebar-active\,\#1e293b\) {
+    background-color: var(--sidebar-active,#1e293b);
   }
   .bg-\[var\(--sidebar\,\#0f172a\)\] {
     background-color: var(--sidebar,#0f172a);
@@ -834,8 +840,14 @@
   .text-\(--on-sidebar-muted\) {
     color: var(--on-sidebar-muted);
   }
+  .text-\(--on-sidebar-muted\,\#9ca3af\) {
+    color: var(--on-sidebar-muted,#9ca3af);
+  }
   .text-\(--on-sidebar-text\) {
     color: var(--on-sidebar-text);
+  }
+  .text-\(--on-sidebar-text\,white\) {
+    color: var(--on-sidebar-text,white);
   }
   .text-\(--primary\) {
     color: var(--primary);

@@ -19,12 +19,12 @@ const LINKS = [
 function Logo() {
   return (
     <div className="flex items-center gap-3">
-      <div className="w-9 h-9 shrink-0 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-[var(--on-sidebar-text,white)]">
+      <div className="w-9 h-9 shrink-0 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-(--on-sidebar-text,white)">
         <FaGaugeHigh size={16} />
       </div>
       <div className="leading-tight">
-        <div className="text-[13px] font-bold text-[var(--on-sidebar-text,white)]">Environmental EMS</div>
-        <div className="text-[11px] font-mono text-[var(--on-sidebar-muted,#9ca3af)]">Flexicare Lanka</div>
+        <div className="text-[13px] font-bold text-(--on-sidebar-text,white)">Environmental EMS</div>
+        <div className="text-[11px] font-mono text-(--on-sidebar-muted,#9ca3af)">Flexicare Lanka</div>
       </div>
     </div>
   );
@@ -39,17 +39,13 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile top bar */}
-      <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-[var(--sidebar,#0f172a)]">
+      <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-(--sidebar,#0f172a)">
         <Logo />
         <div className="flex items-center gap-2">
-          <button aria-label="Notifications" className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--on-sidebar-muted,#9ca3af)] hover:bg-white/10 transition">
+          <button aria-label="Notifications" className="w-9 h-9 rounded-full flex items-center justify-center text-(--on-sidebar-muted,#9ca3af) hover:bg-white/10 transition">
             <FaBell size={14} />
           </button>
-          <button
-            aria-label="Open menu"
-            onClick={() => setOpen(true)}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--on-sidebar-text,white)] hover:bg-white/10 transition"
-          >
+          <button aria-label="Open menu" onClick={() => setOpen(true)} className="w-9 h-9 rounded-full flex items-center justify-center text-(--on-sidebar-text,white) hover:bg-white/10 transition">
             <FaBars size={16} />
           </button>
         </div>
@@ -59,7 +55,7 @@ export default function Sidebar() {
       {open && <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setOpen(false)} />}
 
       {/* Mobile drawer */}
-      <aside className={`fixed top-0 left-0 h-full w-72 bg-[var(--sidebar,#0f172a)] z-50 transform transition-transform duration-300 lg:hidden ${open ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed top-0 left-0 h-full w-72 bg-(--sidebar,#0f172a) z-50 transform transition-transform duration-300 lg:hidden ${open ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/10">
           <Logo />
           <button aria-label="Close menu" onClick={() => setOpen(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:bg-white/10">
@@ -75,7 +71,7 @@ export default function Sidebar() {
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all border-l-2 ${
-                  active ? "bg-[var(--sidebar-active,#1e293b)] text-white border-[#8FC6FF]" : "text-[var(--on-sidebar-muted,#9ca3af)] hover:bg-white/5 hover:text-white border-transparent"
+                  active ? "bg-(--sidebar-active,#1e293b)#8FC6FF]" : "text-(--on-sidebar-muted,#9ca3af) hover:bg-white/5 hover:text-white border-transparent"
                 }`}
               >
                 <item.icon size={15} />
@@ -88,7 +84,7 @@ export default function Sidebar() {
 
       {/* Desktop fixed sidebar — hidden entirely (width 0) when collapsed */}
       <aside
-        className={`hidden lg:flex lg:flex-col lg:shrink-0 bg-[var(--sidebar,#0f172a)] py-6 transition-all duration-300 overflow-hidden min-h-screen ${
+        className={`hidden lg:flex lg:flex-col lg:shrink-0 bg-(--sidebar,#0f172a) py-6 transition-all duration-300 overflow-hidden min-h-screen ${
           hidden ? "lg:w-0 lg:px-0 lg:py-0 lg:opacity-0" : "lg:w-60 px-4 opacity-100"
         }`}
       >
@@ -97,7 +93,7 @@ export default function Sidebar() {
           <button
             aria-label="Hide sidebar"
             onClick={() => setHidden(true)}
-            className="w-7 h-7 shrink-0 rounded-md flex items-center justify-center text-[var(--on-sidebar-muted,#9ca3af)] hover:bg-white/10 hover:text-white transition"
+            className="w-7 h-7 shrink-0 rounded-md flex items-center justify-center text-(--on-sidebar-muted,#9ca3af) hover:bg-white/10 hover:text-white transition"
           >
             <FaAnglesLeft size={13} />
           </button>
@@ -111,7 +107,7 @@ export default function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13.5px] font-medium transition-all border-l-2 whitespace-nowrap ${
-                  active ? "bg-[var(--sidebar-active,#1e293b)] text-white border-[#8FC6FF]" : "text-[var(--on-sidebar-muted,#9ca3af)] hover:bg-white/5 hover:text-white border-transparent"
+                  active ? "bg-(--sidebar-active,#1e293b) text-white border-[#8FC6FF]" : "text-(--on-sidebar-muted,#9ca3af) hover:bg-white/5 hover:text-white border-transparent"
                 }`}
               >
                 <item.icon size={15} />
@@ -121,7 +117,7 @@ export default function Sidebar() {
           })}
         </nav>
 
-        <div className="mt-auto pt-4 px-2 border-t border-white/10 font-mono text-[11px] text-[var(--on-sidebar-muted,#9ca3af)] leading-relaxed whitespace-nowrap">
+        <div className="mt-auto pt-4 px-2 border-t border-white/10 font-mono text-[11px] text-(--on-sidebar-muted,#9ca3af) leading-relaxed whitespace-nowrap">
           Building 2 — Cleanroom Suite
           <br />
           ISO 14644-1 monitored
@@ -130,12 +126,12 @@ export default function Sidebar() {
 
       {/* Desktop top nav bar — appears only when sidebar is hidden */}
       {hidden && (
-        <header className="hidden lg:flex fixed top-0 left-0 right-0 z-40 items-center justify-between px-4 py-3 bg-[var(--sidebar,#0f172a)]">
+        <header className="hidden lg:flex fixed top-0 left-0 right-0 z-40 items-center justify-between px-4 py-3 bg-(--sidebar,#0f172a)">
           <div className="flex items-center gap-3">
             <button
               aria-label="Show sidebar"
               onClick={() => setHidden(false)}
-              className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--on-sidebar-text,white)] hover:bg-white/10 transition"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-(--on-sidebar-text,white) hover:bg-white/10 transition"
             >
               <FaAnglesRight size={15} />
             </button>
@@ -151,7 +147,7 @@ export default function Sidebar() {
                   href={item.href}
                   title={item.label}
                   className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
-                    active ? "bg-[var(--sidebar-active,#1e293b)] text-white" : "text-[var(--on-sidebar-muted,#9ca3af)] hover:bg-white/10 hover:text-white"
+                    active ? "bg-(--sidebar-active,#1e293b) text-white" : "text-(--on-sidebar-muted,#9ca3af) hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <item.icon size={15} />
@@ -160,7 +156,7 @@ export default function Sidebar() {
             })}
           </nav>
 
-          <button aria-label="Notifications" className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--on-sidebar-muted,#9ca3af)] hover:bg-white/10 transition">
+          <button aria-label="Notifications" className="w-9 h-9 rounded-full flex items-center justify-center text-(--on-sidebar-muted,#9ca3af) hover:bg-white/10 transition">
             <FaBell size={14} />
           </button>
         </header>

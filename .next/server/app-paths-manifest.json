@@ -1,10 +1,7 @@
 {
-  "/history/page": "app/history/page.js",
-  "/waterdb/page": "app/waterdb/page.js",
   "/page": "app/page.js",
   "/dashboard/page": "app/dashboard/page.js",
+  "/waterdb/page": "app/waterdb/page.js",
   "/water/page": "app/water/page.js",
-  "/database/page": "app/database/page.js",
-  "/chart/page": "app/chart/page.js",
-  "/pressure/page": "app/pressure/page.js"
+  "/chart/page": "app/chart/page.js"
 }

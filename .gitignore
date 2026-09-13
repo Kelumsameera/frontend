@@ -19,3 +19,5 @@ npm-debug.log*
 
 # TypeScript build metadata
 *.tsbuildinfo
+node_modules/
+.next/
