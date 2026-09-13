@@ -25,12 +25,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Environment
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NEXT_PUBLIC_SOCKET_URL` | `http://localhost:3000` | Socket.IO server |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:3000` | REST API base URL |
 
 ## Backend Contract
 
