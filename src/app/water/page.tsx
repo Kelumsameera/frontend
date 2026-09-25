@@ -31,6 +31,11 @@ const SERIES_COLOR: Record<string, string> = {
   pump_house_tank: "#1AA6C9",
 };
 
+function litersFromCm(cm: number, maxHeightCm: number, capacityLiters: number) {
+  if (!maxHeightCm || !capacityLiters) return 0;
+  return (cm / maxHeightCm) * capacityLiters;
+}
+
 interface WaterChartPoint {
   time: string;
   pump_house_tank: number;
@@ -161,33 +166,42 @@ export default function WaterPage() {
   const pumpCfg = FY600_DEVICES.find((d) => d.id === "pump_house_tank");
   const mainConsumption = useWaterConsumption(readings["main_tank"] ?? [], {
     maxHeightCm: mainCfg?.maxHeightCm ?? 250,
-    capacityLiters: CAPACITY_LITERS["main_tank"] ?? 1000,
   });
   const pumpConsumption = useWaterConsumption(readings["pump_house_tank"] ?? [], {
     maxHeightCm: pumpCfg?.maxHeightCm ?? 250,
-    capacityLiters: CAPACITY_LITERS["pump_house_tank"] ?? 1000,
   });
   const consumptionByDevice: Record<string, ReturnType<typeof useWaterConsumption>> = {
     main_tank: mainConsumption,
     pump_house_tank: pumpConsumption,
   };
 
-  const todayLiters = FY600_DEVICES.reduce((a, d) => a + consumptionByDevice[d.id].todayLiters, 0);
-  const last7DaysLiters = FY600_DEVICES.reduce((a, d) => a + consumptionByDevice[d.id].last7DaysLiters, 0);
-  const avgDailyLiters = FY600_DEVICES.reduce((a, d) => a + consumptionByDevice[d.id].avgDailyLiters, 0);
+  const todayLiters = FY600_DEVICES.reduce((a, d) => {
+    const value = consumptionByDevice[d.id];
+    return a + litersFromCm(value.todayUsedCm, d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
+  }, 0);
+  const last7DaysLiters = FY600_DEVICES.reduce((a, d) => {
+    const value = consumptionByDevice[d.id];
+    return a + litersFromCm(value.last7DaysUsedCm, d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
+  }, 0);
+  const avgDailyLiters = FY600_DEVICES.reduce((a, d) => {
+    const value = consumptionByDevice[d.id];
+    return a + litersFromCm(value.avgDailyUsedCm, d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
+  }, 0);
 
   const firstDevice = FY600_DEVICES[0].id;
   const recentChart = consumptionByDevice[firstDevice].recent.map((point, i) => {
     const row: Record<string, string | number> = { label: point.label };
     FY600_DEVICES.forEach((d) => {
-      row[d.id] = consumptionByDevice[d.id].recent[i]?.liters ?? 0;
+      const value = consumptionByDevice[d.id].recent[i];
+      row[d.id] = litersFromCm(value?.cm ?? 0, d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
     });
     return row;
   });
   const dailyChart = consumptionByDevice[firstDevice].daily.map((point, i) => {
     const row: Record<string, string | number> = { label: point.label };
     FY600_DEVICES.forEach((d) => {
-      row[d.id] = consumptionByDevice[d.id].daily[i]?.liters ?? 0;
+      const value = consumptionByDevice[d.id].daily[i];
+      row[d.id] = litersFromCm(value?.cm ?? 0, d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
     });
     return row;
   });

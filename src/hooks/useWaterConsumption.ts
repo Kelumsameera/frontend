@@ -8,36 +8,30 @@ export interface LevelReading {
 
 export interface ConsumptionBucket {
   label: string;
-  liters: number;
+  cm: number;
 }
 
 interface Options {
   maxHeightCm: number;
-  /** Full-tank volume in liters — used to turn a level (cm) into a volume (L) */
-  capacityLiters: number;
-  /** How readings are grouped for the "recent" chart, default 1 hour */
+  /** How readings are grouped for the recent chart, default 1 hour */
   bucketMs?: number;
-  /** How many buckets to keep for the "recent" chart, default 12 */
+  /** How many buckets to keep for the recent chart, default 12 */
   bucketCount?: number;
 }
 
 export interface WaterConsumptionResult {
-  /** Liters used since local midnight today */
-  todayLiters: number;
-  /** Liters used in the last 7 days */
-  last7DaysLiters: number;
-  /** Average liters used per day, computed over days that have data */
-  avgDailyLiters: number;
+  /** Height used since local midnight today, in cm */
+  todayUsedCm: number;
+  /** Height used in the last 7 days, in cm */
+  last7DaysUsedCm: number;
+  /** Average height used per day, in cm */
+  avgDailyUsedCm: number;
   /** Consumption grouped into recent buckets (e.g. hourly), oldest first */
   recent: ConsumptionBucket[];
   /** Consumption grouped by calendar day, oldest first, up to 7 days */
   daily: ConsumptionBucket[];
 }
 
-function litersFromLevel(levelCm: number, maxHeightCm: number, capacityLiters: number) {
-  const percent = Math.max(0, Math.min(1, levelCm / maxHeightCm));
-  return percent * capacityLiters;
-}
 
 function dayKey(t: number) {
   const d = new Date(t);
@@ -58,19 +52,19 @@ function dayLabel(t: number) {
  */
 export function useWaterConsumption(
   readings: LevelReading[],
-  { maxHeightCm, capacityLiters, bucketMs = 60 * 60 * 1000, bucketCount = 12 }: Options
+  { maxHeightCm, bucketMs = 60 * 60 * 1000, bucketCount = 12 }: Options
 ): WaterConsumptionResult {
   return useMemo(() => {
     const sorted = [...readings].sort((a, b) => a.time - b.time);
 
     // consumption deltas: only count drops, ignore refills
-    const deltas: { time: number; liters: number }[] = [];
+    const deltas: { time: number; cm: number }[] = [];
     for (let i = 1; i < sorted.length; i++) {
-      const prevL = litersFromLevel(sorted[i - 1].levelCm, maxHeightCm, capacityLiters);
-      const currL = litersFromLevel(sorted[i].levelCm, maxHeightCm, capacityLiters);
-      const used = prevL - currL;
+      const prevLevel = Math.max(0, Math.min(maxHeightCm, sorted[i - 1].levelCm));
+      const currLevel = Math.max(0, Math.min(maxHeightCm, sorted[i].levelCm));
+      const used = prevLevel - currLevel;
       if (used > 0) {
-        deltas.push({ time: sorted[i].time, liters: used });
+        deltas.push({ time: sorted[i].time, cm: used });
       }
     }
 
@@ -78,47 +72,47 @@ export function useWaterConsumption(
     const midnight = new Date();
     midnight.setHours(0, 0, 0, 0);
 
-    const todayLiters = deltas
+    const todayUsedCm = deltas
       .filter((d) => d.time >= midnight.getTime())
-      .reduce((a, d) => a + d.liters, 0);
+      .reduce((a, d) => a + d.cm, 0);
 
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
     const last7 = deltas.filter((d) => d.time >= sevenDaysAgo);
-    const last7DaysLiters = last7.reduce((a, d) => a + d.liters, 0);
+    const last7DaysUsedCm = last7.reduce((a, d) => a + d.cm, 0);
 
     const daysWithData = new Set(last7.map((d) => dayKey(d.time))).size || 1;
-    const avgDailyLiters = last7DaysLiters / daysWithData;
+    const avgDailyUsedCm = last7DaysUsedCm / daysWithData;
 
     // recent buckets (e.g. hourly) for a short-term trend chart
-    const bucketStart = now - bucketMs * bucketCount;
+    const bucketStart = midnight.getTime();
     const buckets = Array.from({ length: bucketCount }, (_, i) => {
       const start = bucketStart + i * bucketMs;
-      return { start, end: start + bucketMs, liters: 0 };
+      return { start, end: start + bucketMs, cm: 0 };
     });
     for (const d of deltas) {
       const b = buckets.find((bk) => d.time >= bk.start && d.time < bk.end);
-      if (b) b.liters += d.liters;
+      if (b) b.cm += d.cm;
     }
     const recent: ConsumptionBucket[] = buckets.map((b) => ({
       label: new Date(b.start).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
-      liters: Math.round(b.liters),
+      cm: Math.round(b.cm * 10) / 10,
     }));
 
     // daily buckets, last 7 calendar days, oldest first
-    const dayMap = new Map<string, { time: number; liters: number }>();
+    const dayMap = new Map<string, { time: number; cm: number }>();
     for (const d of last7) {
       const key = dayKey(d.time);
-      const entry = dayMap.get(key) ?? { time: d.time, liters: 0 };
-      entry.liters += d.liters;
+      const entry = dayMap.get(key) ?? { time: d.time, cm: 0 };
+      entry.cm += d.cm;
       dayMap.set(key, entry);
     }
     const daily: ConsumptionBucket[] = Array.from({ length: 7 }, (_, i) => {
       const t = now - (6 - i) * 24 * 60 * 60 * 1000;
       const key = dayKey(t);
       const entry = dayMap.get(key);
-      return { label: dayLabel(t), liters: Math.round(entry?.liters ?? 0) };
+      return { label: dayLabel(t), cm: Math.round((entry?.cm ?? 0) * 10) / 10 };
     });
 
-    return { todayLiters, last7DaysLiters, avgDailyLiters, recent, daily };
-  }, [readings, maxHeightCm, capacityLiters, bucketMs, bucketCount]);
+    return { todayUsedCm, last7DaysUsedCm, avgDailyUsedCm, recent, daily };
+  }, [readings, maxHeightCm, bucketMs, bucketCount]);
 }
