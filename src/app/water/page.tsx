@@ -9,7 +9,7 @@ import { useSocket } from "@/hooks/useSocket";
 import { useWaterConsumption, type LevelReading } from "@/hooks/useWaterConsumption";
 import { fetchWaterHistory, fetchRealtimeWater } from "@/lib/api";
 import type { DualTankState, WaterTankUpdate, HistoryRow } from "@/types";
-import { FY600_DEVICES } from "@/types";
+import { FY600_DEVICES, DEVICE_LABELS } from "@/types";
 
 const MAX_HISTORY = 40; // live trend chart points
 const MAX_READINGS = 3000; // raw readings kept per tank for consumption calc
@@ -197,14 +197,52 @@ export default function WaterPage() {
     });
     return row;
   });
-  const dailyChart = consumptionByDevice[firstDevice].daily.map((point, i) => {
-    const row: Record<string, string | number> = { label: point.label };
-    FY600_DEVICES.forEach((d) => {
-      const value = consumptionByDevice[d.id].daily[i];
-      row[d.id] = litersFromCm(value?.cm ?? 0, d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
-    });
-    return row;
-  });
+
+  // ── DB History chart state ───────────────────────────────
+  const getToday = () => new Date().toISOString().split("T")[0];
+  const [historyStartDate, setHistoryStartDate] = useState(getToday());
+  const [historyStartTime, setHistoryStartTime] = useState("00:00");
+  const [historyEndDate, setHistoryEndDate] = useState(getToday());
+  const [historyEndTime, setHistoryEndTime] = useState("23:59");
+  const [historyDevice, setHistoryDevice] = useState("ALL");
+  const [dbHistoryLoading, setDbHistoryLoading] = useState(false);
+  const [dbHistoryError, setDbHistoryError] = useState<string | null>(null);
+  const [dbHistoryRows, setDbHistoryRows] = useState<HistoryRow[]>([]);
+
+  /** Pivot DB rows into chart-ready data: one object per unique timestamp, with a key per device */
+  interface DbChartPoint {
+    time: string;
+    [device: string]: string | number;
+  }
+  const dbHistoryData: DbChartPoint[] = (() => {
+    if (!dbHistoryRows.length) return [];
+    const map = new Map<string, DbChartPoint>();
+    for (const row of dbHistoryRows) {
+      const t = new Date(row.time).toLocaleString();
+      if (!map.has(t)) map.set(t, { time: t });
+      const point = map.get(t)!;
+      point[row.device] = Number(row.value) || 0;
+    }
+    return Array.from(map.values());
+  })();
+  const dbHistoryDeviceKeys = [...new Set(dbHistoryRows.map((r) => r.device))];
+
+  const loadDbHistory = async () => {
+    setDbHistoryLoading(true);
+    setDbHistoryError(null);
+    try {
+      const start = `${historyStartDate} ${historyStartTime}:00`;
+      const end = `${historyEndDate} ${historyEndTime}:00`;
+      const device = historyDevice !== "ALL" ? historyDevice : undefined;
+      const data = await fetchWaterHistory(start, end, device);
+      setDbHistoryRows(data.slice(-5000));
+      if (data.length === 0) setDbHistoryError("No data found for the selected range");
+    } catch {
+      setDbHistoryError("Failed to fetch data — check API connection");
+      setDbHistoryRows([]);
+    }
+    setDbHistoryLoading(false);
+  };
 
   return (
     <div className="px-4 py-6 lg:px-10 lg:py-10 max-w-6xl mx-auto">
@@ -308,22 +346,84 @@ export default function WaterPage() {
         </ResponsiveContainer>
       </Card>
 
-      {/* Daily usage, last 7 days */}
+      {/* Water History — fetch from database by date range */}
       <div>
-        <SectionLabel title="Daily usage" subtitle="Last 7 days, both tanks" />
+        <SectionLabel title="Water History" subtitle="Database records — filter by date and tank" />
         <Card className="p-4 lg:p-6">
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={dailyChart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={false} tickLine={false} label={{ value: "L", angle: -90, position: "insideLeft", style: { fill: "#5C7290", fontSize: 12 } }} />
-              <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+            <input
+              type="date"
+              value={historyStartDate}
+              onChange={(e) => setHistoryStartDate(e.target.value)}
+              className="border border-(--border) px-3 py-2 rounded-lg text-sm bg-(--panel) text-(--text)"
+            />
+            <input
+              type="time"
+              value={historyStartTime}
+              onChange={(e) => setHistoryStartTime(e.target.value)}
+              className="border border-(--border) px-3 py-2 rounded-lg text-sm bg-(--panel) text-(--text)"
+            />
+            <input
+              type="date"
+              value={historyEndDate}
+              onChange={(e) => setHistoryEndDate(e.target.value)}
+              className="border border-(--border) px-3 py-2 rounded-lg text-sm bg-(--panel) text-(--text)"
+            />
+            <input
+              type="time"
+              value={historyEndTime}
+              onChange={(e) => setHistoryEndTime(e.target.value)}
+              className="border border-(--border) px-3 py-2 rounded-lg text-sm bg-(--panel) text-(--text)"
+            />
+            <select value={historyDevice} onChange={(e) => setHistoryDevice(e.target.value)} className="border border-(--border) px-3 py-2 rounded-lg text-sm bg-(--panel) text-(--text)">
+              <option value="ALL">All Tanks</option>
               {FY600_DEVICES.map((d) => (
-                <Line key={d.id} type="monotone" dataKey={d.id} name={d.label} stroke={SERIES_COLOR[d.id] ?? "#1768D1"} strokeWidth={2.5} dot={{ r: 3 }} isAnimationActive={false} />
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
               ))}
-            </LineChart>
-          </ResponsiveContainer>
+            </select>
+          </div>
+          <button
+            onClick={loadDbHistory}
+            disabled={dbHistoryLoading}
+            className="mb-4 px-5 py-2 rounded-lg text-sm font-semibold text-white transition"
+            style={{ background: dbHistoryLoading ? "#94a3b8" : "var(--primary)" }}
+          >
+            {dbHistoryLoading ? "⏳ Loading…" : "Load History"}
+          </button>
+
+          {dbHistoryError && (
+            <p className="text-sm mb-3" style={{ color: "var(--critical)" }}>
+              {dbHistoryError}
+            </p>
+          )}
+
+          {dbHistoryData.length > 0 ? (
+            <>
+              <p className="text-xs mb-2 text-(--text-faint)">{dbHistoryData.length} data points</p>
+              <ResponsiveContainer width="100%" height={320}>
+                <LineChart data={dbHistoryData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
+                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "#5C7290" }}
+                    axisLine={false}
+                    tickLine={false}
+                    label={{ value: "cm", angle: -90, position: "insideLeft", style: { fill: "#5C7290", fontSize: 12 } }}
+                  />
+                  <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {dbHistoryDeviceKeys.map((key) => (
+                    <Line key={key} type="monotone" dataKey={key} name={DEVICE_LABELS[key] || key} stroke={SERIES_COLOR[key] ?? "#1768D1"} strokeWidth={2} dot={false} isAnimationActive={false} />
+                  ))}
+                  <Brush dataKey="time" height={28} stroke="#1768D1" fill="#E4F0FD" />
+                </LineChart>
+              </ResponsiveContainer>
+            </>
+          ) : (
+            !dbHistoryLoading && <p className="text-sm text-(--text-faint) text-center py-8">Select a date range and click &quot;Load History&quot; to view data</p>
+          )}
         </Card>
       </div>
     </div>
