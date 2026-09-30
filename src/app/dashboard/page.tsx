@@ -86,7 +86,7 @@ export default function DashboardPage() {
     onWaterTankUpdate,
   });
 
-  const mainPercent = percentFromLevel(tanks["main_tank"]?.level ?? 0, 250);
+  const mainPercent = percentFromLevel(tanks["main_tank"]?.level ?? 0, 162);
   const pumpPercent = percentFromLevel(tanks["pump_house_tank"]?.level ?? 0, 250);
 
   const alarms = [
