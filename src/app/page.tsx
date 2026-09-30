@@ -42,7 +42,7 @@ export default function HomePage() {
 
   useSocket({ onModbusUpdate, onWaterTankUpdate });
 
-  const mainPercent = percentFromLevel(tanks["main_tank"]?.level ?? 0, 250);
+  const mainPercent = percentFromLevel(tanks["main_tank"]?.level ?? 0, 162);
   const pumpPercent = percentFromLevel(tanks["pump_house_tank"]?.level ?? 0, 250);
 
   const worst: Status[] = [pressureStatus(pressure.production_clean_room), pressureStatus(pressure.assembly_clean_room), tankPercentStatus(mainPercent), tankPercentStatus(pumpPercent)];
