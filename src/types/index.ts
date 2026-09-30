@@ -19,7 +19,7 @@ export interface FY600DeviceConfig {
 /** Registry of all FY600 devices */
 export const FY600_DEVICES: FY600DeviceConfig[] = [
   { id: "pump_house_tank", label: "Pump House Tank", maxHeightCm: 250 },
-  { id: "main_tank", label: "Main Tank", maxHeightCm: 250 },
+  { id: "main_tank", label: "Main Tank", maxHeightCm: 162 },
 ];
 
 /** Human-readable labels */
