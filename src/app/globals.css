@@ -142,3 +142,12 @@ input[type="time"] {
   .dashboard-overview .dashboard-tank-card .text-3xl { font-size: 22px; }
   .dashboard-overview .dashboard-chart-card { height: clamp(145px, 24vh, 220px); }
 }
+
+/* Smaller top readings leave room for independent chart controls. */
+.dashboard-overview .dashboard-stats > div { padding: 8px 10px; border-radius: 12px; }
+.dashboard-overview .dashboard-stats > div > div:first-of-type > div { font-size: 11px; }
+.dashboard-overview .dashboard-stats > div > div:last-child { font-size: 19px; margin-top: 2px; }
+.dashboard-overview .dashboard-stats > div > div:last-child span { font-size: 11px; }
+@media (min-width: 1024px) {
+  .dashboard-overview .dashboard-stats > div > div:last-child { font-size: 19px; margin-top: 2px; }
+}

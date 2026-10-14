@@ -26,9 +26,10 @@ export default function DashboardPage() {
 
   const [tanks, setTanks] = useState<DualTankState>({});
 
-  const [trendMinutes, setTrendMinutes] = useState(60);
-  const pressureTrend = useRollingTrend("pressure/trend", trendMinutes);
-  const waterTrend = useRollingTrend("water-tank/trend", trendMinutes);
+  const [pressureMinutes, setPressureMinutes] = useState(60);
+  const [waterMinutes, setWaterMinutes] = useState(60);
+  const pressureTrend = useRollingTrend("pressure/trend", pressureMinutes);
+  const waterTrend = useRollingTrend("water-tank/trend", waterMinutes);
 
   const onModbusUpdate = useCallback((data: ModbusUpdate) => {
     const value = Number(data.value) || 0;
@@ -145,22 +146,22 @@ export default function DashboardPage() {
       </div>
 
       </div>
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Dashboard trend time range">
-        {[{ minutes: 30, label: "30 minutes" }, { minutes: 60, label: "1 hour" }, { minutes: 360, label: "6 hours" }, { minutes: 1440, label: "24 hours" }].map((range) => (
-          <button key={range.minutes} aria-pressed={trendMinutes === range.minutes} onClick={() => setTrendMinutes(range.minutes)} className="px-3 py-1 rounded-lg border text-xs" style={{ background: trendMinutes === range.minutes ? "var(--primary)" : "var(--panel)", color: trendMinutes === range.minutes ? "white" : "var(--text)" }}>{range.label}</button>
-        ))}
-        {(pressureTrend.loading || waterTrend.loading) && <span role="status" className="text-xs">Loading history…</span>}
-        {(pressureTrend.error || waterTrend.error) && <span role="alert" className="text-xs">History unavailable; showing live readings.</span>}
-      </div>
       <div className="dashboard-trends grid grid-cols-1 lg:grid-cols-2 gap-3">
       {/* Pressure trend chart */}
       <div>
         <SectionLabel title="Pressure Trend" subtitle="Historical averages with live updates" />
+        <div className="flex flex-wrap items-center gap-1 mb-2" role="group" aria-label="Pressure trend time range">
+          {[{ minutes: 30, label: "30 minutes" }, { minutes: 60, label: "1 hour" }, { minutes: 360, label: "6 hours" }, { minutes: 1440, label: "24 hours" }].map((range) => (
+            <button key={range.minutes} aria-pressed={pressureMinutes === range.minutes} onClick={() => setPressureMinutes(range.minutes)} className="px-2 py-1 rounded-lg border text-xs" style={{ background: pressureMinutes === range.minutes ? "var(--primary)" : "var(--panel)", color: pressureMinutes === range.minutes ? "white" : "var(--text)" }}>{range.label}</button>
+          ))}
+          {pressureTrend.loading && <span role="status" className="text-xs">Loading…</span>}
+          {pressureTrend.error && <span role="alert" className="text-xs">History unavailable</span>}
+        </div>
         <Card className="dashboard-chart-card p-2 lg:p-3">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={pressureTrend.points}>
               <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
-              <XAxis dataKey="time" type="number" scale="time" domain={[pressureTrend.end - trendMinutes * 60000, pressureTrend.end]} tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} tick={{ fontSize: 10, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
+              <XAxis dataKey="time" type="number" scale="time" domain={[pressureTrend.end - pressureMinutes * 60000, pressureTrend.end]} tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} tick={{ fontSize: 10, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
               <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={false} tickLine={false} />
               <Tooltip labelFormatter={(time) => new Date(Number(time)).toLocaleString()} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -175,11 +176,18 @@ export default function DashboardPage() {
       {(
         <div>
           <SectionLabel title="Water Level Trend" subtitle="Historical averages with live updates" />
+        <div className="flex flex-wrap items-center gap-1 mb-2" role="group" aria-label="Water trend time range">
+          {[{ minutes: 30, label: "30 minutes" }, { minutes: 60, label: "1 hour" }, { minutes: 360, label: "6 hours" }, { minutes: 1440, label: "24 hours" }].map((range) => (
+            <button key={range.minutes} aria-pressed={waterMinutes === range.minutes} onClick={() => setWaterMinutes(range.minutes)} className="px-2 py-1 rounded-lg border text-xs" style={{ background: waterMinutes === range.minutes ? "var(--primary)" : "var(--panel)", color: waterMinutes === range.minutes ? "white" : "var(--text)" }}>{range.label}</button>
+          ))}
+          {waterTrend.loading && <span role="status" className="text-xs">Loading…</span>}
+          {waterTrend.error && <span role="alert" className="text-xs">History unavailable</span>}
+        </div>
           <Card className="dashboard-chart-card p-2 lg:p-3">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={waterTrend.points}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
-                <XAxis dataKey="time" type="number" scale="time" domain={[waterTrend.end - trendMinutes * 60000, waterTrend.end]} tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} tick={{ fontSize: 10, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
+                <XAxis dataKey="time" type="number" scale="time" domain={[waterTrend.end - waterMinutes * 60000, waterTrend.end]} tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} tick={{ fontSize: 10, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
                 <YAxis
                   domain={["auto", "auto"]}
                   tick={{ fontSize: 11, fill: "#5C7290" }}
