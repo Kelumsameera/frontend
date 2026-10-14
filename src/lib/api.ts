@@ -48,3 +48,9 @@ export async function fetchRealtimeWater(
   if (!res.ok) throw new Error("Failed to fetch realtime water data");
   return res.json();
 }
+
+export async function fetchWaterTrend(minutes: number): Promise<HistoryRow[]> {
+  const res = await fetch(`${API_URL}/water-tank/trend?minutes=${minutes}`);
+  if (!res.ok) throw new Error("Failed to fetch water trend");
+  return res.json();
+}

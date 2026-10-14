@@ -7,11 +7,11 @@ import ConnectionStatus from "@/components/ConnectionStatus";
 import { Card, PageHeader, SectionLabel, StatusPill, tankPercentStatus, LiveClock } from "@/components/ui";
 import { useSocket } from "@/hooks/useSocket";
 import { useWaterConsumption, type LevelReading } from "@/hooks/useWaterConsumption";
-import { fetchWaterHistory, fetchRealtimeWater } from "@/lib/api";
+import { fetchWaterHistory, fetchRealtimeWater, fetchWaterTrend } from "@/lib/api";
 import type { DualTankState, WaterTankUpdate, HistoryRow } from "@/types";
 import { FY600_DEVICES, DEVICE_LABELS } from "@/types";
 
-const MAX_HISTORY = 40; // live trend chart points
+const TREND_RANGES = [{ minutes: 30, label: "30 minutes" }, { minutes: 60, label: "1 hour" }, { minutes: 360, label: "6 hours" }, { minutes: 1440, label: "24 hours" }];
 const MAX_READINGS = 3000; // raw readings kept per tank for consumption calc
 const HISTORY_DAYS = 7;
 
@@ -37,9 +37,9 @@ function litersFromCm(cm: number, maxHeightCm: number, capacityLiters: number) {
 }
 
 interface WaterChartPoint {
-  time: string;
-  pump_house_tank: number;
-  main_tank: number;
+  time: number;
+  pump_house_tank: number | null;
+  main_tank: number | null;
 }
 
 function percentFromLevel(levelCm: number, maxHeightCm: number) {
@@ -69,6 +69,11 @@ function mergeHistoryAndLive(history: LevelReading[], current: LevelReading[]): 
 export default function WaterPage() {
   const [tanks, setTanks] = useState<DualTankState>({});
   const [waterHistory, setWaterHistory] = useState<WaterChartPoint[]>([]);
+  const [trendMinutes, setTrendMinutes] = useState(60);
+  const [trendLoading, setTrendLoading] = useState(true);
+  const [trendError, setTrendError] = useState<string | null>(null);
+  const [trendEnd, setTrendEnd] = useState(Date.now());
+  const bucketMs = Math.max(15, trendMinutes * 60 / 120) * 1000;
   const [readings, setReadings] = useState<Record<string, LevelReading[]>>(Object.fromEntries(FY600_DEVICES.map((d) => [d.id, []])));
   const [historyLoading, setHistoryLoading] = useState(true);
 
@@ -87,23 +92,72 @@ export default function WaterPage() {
       },
     }));
 
-    setWaterHistory((prev) => {
-      const last = prev.at(-1);
-      const next: WaterChartPoint = {
-        time: new Date().toLocaleTimeString(),
-        pump_house_tank: deviceId === "pump_house_tank" ? level : (last?.pump_house_tank ?? 0),
-        main_tank: deviceId === "main_tank" ? level : (last?.main_tank ?? 0),
-      };
-      return [...prev.slice(-(MAX_HISTORY - 1)), next];
-    });
+    if (deviceId === "main_tank" || deviceId === "pump_house_tank") {
+      const now = Date.now();
+      const time = Math.floor(now / bucketMs) * bucketMs;
+      setTrendEnd(now);
+      setWaterHistory((prev) => {
+        const points = prev.filter((p) => p.time >= now - trendMinutes * 60000);
+        const index = points.findIndex((p) => p.time === time);
+        const point = index >= 0 ? points[index] : { time, main_tank: null, pump_house_tank: null };
+        const updated = { ...point, [deviceId]: level };
+        if (index >= 0) points[index] = updated;
+        else points.push(updated);
+        return points.sort((a, b) => a.time - b.time);
+      });
+    }
 
     setReadings((prev) => ({
       ...prev,
       [deviceId]: [...(prev[deviceId] ?? []).slice(-(MAX_READINGS - 1)), { time: Date.now(), levelCm: level }],
     }));
-  }, []);
+  }, [bucketMs, trendMinutes]);
 
   const { status } = useSocket({ onWaterTankUpdate });
+
+  useEffect(() => {
+    let cancelled = false;
+    setTrendLoading(true);
+    setTrendError(null);
+    setWaterHistory([]);
+    async function loadTrend() {
+      try {
+        const rows = await fetchWaterTrend(trendMinutes);
+        if (cancelled) return;
+        const now = Date.now();
+        const points = new Map<number, WaterChartPoint>();
+        for (const row of rows) {
+          const parsed = Date.parse(row.time.replace(" ", "T") + "+05:30");
+          if (!Number.isFinite(parsed) || (row.device !== "main_tank" && row.device !== "pump_house_tank")) continue;
+          const time = Math.floor(parsed / bucketMs) * bucketMs;
+          const point = points.get(time) ?? { time, main_tank: null, pump_house_tank: null };
+          point[row.device] = Number(row.value);
+          points.set(time, point);
+        }
+        setWaterHistory((live) => {
+          for (const point of live) {
+            if (point.time < now - trendMinutes * 60000) continue;
+            const historical = points.get(point.time);
+            points.set(point.time, {
+              time: point.time,
+              main_tank: point.main_tank ?? historical?.main_tank ?? null,
+              pump_house_tank: point.pump_house_tank ?? historical?.pump_house_tank ?? null,
+            });
+          }
+          return [...points.values()].sort((a, b) => a.time - b.time);
+        });
+        setTrendEnd(now);
+        setTrendError(null);
+      } catch {
+        if (!cancelled) setTrendError("History unavailable; showing received live readings.");
+      } finally {
+        if (!cancelled) setTrendLoading(false);
+      }
+    }
+    loadTrend();
+    const timer = setInterval(loadTrend, 60000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [trendMinutes, bucketMs]);
 
   // Seed 7 days of DB history (for the consumption stats/charts) and the
   // current level (so tanks don't sit empty while waiting for the first
@@ -278,12 +332,23 @@ export default function WaterPage() {
 
       {/* Live trend chart */}
       <div className="mb-10">
-        <SectionLabel title="Water Level Trend" subtitle={`Last ${MAX_HISTORY} live readings`} />
+        <SectionLabel title="Water Level Trend" subtitle={`${TREND_RANGES.find((r) => r.minutes === trendMinutes)?.label} · historical averages with live updates`} />
+        <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="Water trend time range">
+          {TREND_RANGES.map((range) => (
+            <button key={range.minutes} aria-pressed={trendMinutes === range.minutes} onClick={() => setTrendMinutes(range.minutes)}
+              className="px-3 py-2 rounded-lg border text-sm" style={{ background: trendMinutes === range.minutes ? "var(--primary)" : "var(--panel)", color: trendMinutes === range.minutes ? "white" : "var(--text)" }}>
+              {range.label}
+            </button>
+          ))}
+        </div>
         <Card className="p-4 lg:p-6">
+          {trendLoading && <p role="status" className="text-sm mb-2">Loading trend history…</p>}
+          {trendError && <p role="alert" className="text-sm mb-2">{trendError}</p>}
+          {!trendLoading && !waterHistory.length && <p className="text-sm mb-2">No readings in this time range.</p>}
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={waterHistory}>
               <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
-              <XAxis dataKey="time" tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
+              <XAxis dataKey="time" type="number" scale="time" domain={[trendEnd - trendMinutes * 60000, trendEnd]} tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
               <YAxis
                 domain={["auto", "auto"]}
                 tick={{ fontSize: 11, fill: "#5C7290" }}
@@ -291,11 +356,11 @@ export default function WaterPage() {
                 tickLine={false}
                 label={{ value: "cm", angle: -90, position: "insideLeft", style: { fill: "#5C7290", fontSize: 12 } }}
               />
-              <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
+              <Tooltip labelFormatter={(time) => new Date(Number(time)).toLocaleString()} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Line type="monotone" dataKey="main_tank" name="Main Tank" stroke="#1768D1" strokeWidth={2.5} dot={false} isAnimationActive={false} />
               <Line type="monotone" dataKey="pump_house_tank" name="Pump House Tank" stroke="#1AA6C9" strokeWidth={2.5} dot={false} isAnimationActive={false} />
-              <Brush dataKey="time" height={28} stroke="#1768D1" fill="#E4F0FD" />
+              
             </LineChart>
           </ResponsiveContainer>
         </Card>
