@@ -163,7 +163,7 @@ export default function DashboardPage() {
               <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
               <XAxis dataKey="time" type="number" scale="time" domain={[pressureTrend.end - pressureMinutes * 60000, pressureTrend.end]} tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} tick={{ fontSize: 10, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
               <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={false} tickLine={false} />
-              <Tooltip labelFormatter={(time) => new Date(Number(time)).toLocaleString()} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
+              <Tooltip formatter={(value) => Number(value).toFixed(2)} labelFormatter={(time) => new Date(Number(time)).toLocaleString()} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Line type="monotone" dataKey="production_clean_room" name="Production" stroke="#1768D1" strokeWidth={2.5} dot={false} isAnimationActive={false} />
               <Line type="monotone" dataKey="assembly_clean_room" name="Assembly" stroke="#7A63D6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
@@ -195,7 +195,7 @@ export default function DashboardPage() {
                   tickLine={false}
                   label={{ value: "cm", angle: -90, position: "insideLeft", style: { fill: "#5C7290", fontSize: 12 } }}
                 />
-                <Tooltip labelFormatter={(time) => new Date(Number(time)).toLocaleString()} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
+                <Tooltip formatter={(value) => Number(value).toFixed(2)} labelFormatter={(time) => new Date(Number(time)).toLocaleString()} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Line type="monotone" dataKey="pump_house_tank" name="Pump House Tank" stroke="#1AA6C9" strokeWidth={2.5} dot={false} isAnimationActive={false} />
                 <Line type="monotone" dataKey="main_tank" name="Main Tank" stroke="#7A63D6" strokeWidth={2.5} dot={false} isAnimationActive={false} />

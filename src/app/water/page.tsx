@@ -315,7 +315,7 @@ export default function WaterPage() {
                 tickLine={false}
                 label={{ value: "cm", angle: -90, position: "insideLeft", style: { fill: "#5C7290", fontSize: 12 } }}
               />
-              <Tooltip labelFormatter={(time) => new Date(Number(time)).toLocaleString()} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
+              <Tooltip formatter={(value) => Number(value).toFixed(2)} labelFormatter={(time) => new Date(Number(time)).toLocaleString()} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Line type="monotone" dataKey="main_tank" name="Main Tank" stroke="#1768D1" strokeWidth={2.5} dot={false} isAnimationActive={false} />
               <Line type="monotone" dataKey="pump_house_tank" name="Pump House Tank" stroke="#1AA6C9" strokeWidth={2.5} dot={false} isAnimationActive={false} />
@@ -362,7 +362,7 @@ export default function WaterPage() {
             <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={false} tickLine={false} label={{ value: "L", angle: -90, position: "insideLeft", style: { fill: "#5C7290", fontSize: 12 } }} />
-            <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
+            <Tooltip formatter={(value) => Number(value).toFixed(2)} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {FY600_DEVICES.map((d) => (
               <Bar key={d.id} dataKey={d.id} name={d.label} fill={SERIES_COLOR[d.id] ?? "#1768D1"} radius={[4, 4, 0, 0]} isAnimationActive={false} />
@@ -437,7 +437,7 @@ export default function WaterPage() {
                     tickLine={false}
                     label={{ value: "cm", angle: -90, position: "insideLeft", style: { fill: "#5C7290", fontSize: 12 } }}
                   />
-                  <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
+                  <Tooltip formatter={(value) => Number(value).toFixed(2)} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   {dbHistoryDeviceKeys.map((key) => (
                     <Line key={key} type="monotone" dataKey={key} name={DEVICE_LABELS[key] || key} stroke={SERIES_COLOR[key] ?? "#1768D1"} strokeWidth={2} dot={false} isAnimationActive={false} />
