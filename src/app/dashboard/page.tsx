@@ -97,7 +97,7 @@ export default function DashboardPage() {
   ].filter((a) => a.status !== "normal");
 
   return (
-    <div className="px-4 py-6 lg:px-8 lg:py-8 space-y-8 max-w-7xl mx-auto">
+    <div className="dashboard-overview px-4 py-6 lg:px-4 lg:py-3 space-y-5 lg:space-y-3 max-w-7xl mx-auto">
       <PageHeader
         title="Live Dashboard"
         subtitle="Pressure & Water Tanks · Flexicare Lanka"
@@ -117,7 +117,7 @@ export default function DashboardPage() {
       )}
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="dashboard-stats grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard title="Production Pressure" value={pressure.production_clean_room} unit="Pa" />
         <StatCard title="Assembly Pressure" value={pressure.assembly_clean_room} unit="Pa" />
         {FY600_DEVICES.map((device) => (
@@ -125,18 +125,19 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      <div className="dashboard-instruments grid grid-cols-1 lg:grid-cols-2 gap-3">
       {/* Pressure Gauges */}
       <div>
         <SectionLabel title="Cleanroom Differential Pressure" subtitle="Production & Assembly floors" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="p-6 flex flex-col items-center gap-2">
+        <div className="grid grid-cols-2 gap-3">
+          <Card className="dashboard-instrument-card p-3 flex flex-col items-center gap-1">
             <div className="flex items-center justify-between w-full">
               <span className="text-sm font-semibold text-(--text)">Production Clean Room</span>
               <StatusPill status={pressureStatus(pressure.production_clean_room)} />
             </div>
             <PressureGauge value={pressure.production_clean_room} />
           </Card>
-          <Card className="p-6 flex flex-col items-center gap-2">
+          <Card className="dashboard-instrument-card p-3 flex flex-col items-center gap-1">
             <div className="flex items-center justify-between w-full">
               <span className="text-sm font-semibold text-(--text)">Assembly Clean Room</span>
               <StatusPill status={pressureStatus(pressure.assembly_clean_room)} />
@@ -149,13 +150,13 @@ export default function DashboardPage() {
       {/* Water Tanks */}
       <div>
         <SectionLabel title="Water Tank Levels" subtitle="Main tank & pump house tank" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 gap-3">
           {FY600_DEVICES.map((device) => {
             const tankData = tanks[device.id];
             const percent = percentFromLevel(tankData?.level ?? 0, device.maxHeightCm);
             return (
-              <Card key={device.id} className="p-6 flex flex-col items-center gap-2 relative">
-                <div className="absolute top-5 right-5">
+              <Card key={device.id} className="dashboard-instrument-card dashboard-tank-card p-3 flex flex-col items-center gap-1 relative">
+                <div className="absolute top-2 right-2">
                   <StatusPill status={tankPercentStatus(percent)} />
                 </div>
                 <RoundTank levelCm={tankData?.level ?? 0} setpoint={tankData?.setpoint ?? 0} output={tankData?.output ?? 0} label={device.label} maxHeightCm={device.maxHeightCm} />
@@ -165,11 +166,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      </div>
+      <div className="dashboard-trends grid grid-cols-1 lg:grid-cols-2 gap-3">
       {/* Pressure trend chart */}
       <div>
         <SectionLabel title="Pressure Trend" subtitle={`Last ${MAX_HISTORY} live readings`} />
-        <Card className="p-4 lg:p-6">
-          <ResponsiveContainer width="100%" height={300}>
+        <Card className="dashboard-chart-card p-2 lg:p-3">
+          <ResponsiveContainer width="100%" height="100%">
             <LineChart data={history}>
               <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
               <XAxis dataKey="time" tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
@@ -178,7 +181,7 @@ export default function DashboardPage() {
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Line type="monotone" dataKey="production" name="Production" stroke="#1768D1" strokeWidth={2.5} dot={false} isAnimationActive={false} />
               <Line type="monotone" dataKey="assembly" name="Assembly" stroke="#7A63D6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
-              <Brush dataKey="time" height={28} stroke="#1768D1" fill="#E4F0FD" />
+              <Brush dataKey="time" height={18} stroke="#1768D1" fill="#E4F0FD" />
             </LineChart>
           </ResponsiveContainer>
         </Card>
@@ -188,8 +191,8 @@ export default function DashboardPage() {
       {waterHistory.length > 0 && (
         <div>
           <SectionLabel title="Water Level Trend" subtitle={`Last ${MAX_HISTORY} live readings`} />
-          <Card className="p-4 lg:p-6">
-            <ResponsiveContainer width="100%" height={300}>
+          <Card className="dashboard-chart-card p-2 lg:p-3">
+            <ResponsiveContainer width="100%" height="100%">
               <LineChart data={waterHistory}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
                 <XAxis dataKey="time" tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
@@ -204,12 +207,13 @@ export default function DashboardPage() {
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Line type="monotone" dataKey="pump_house_tank" name="Pump House Tank" stroke="#1AA6C9" strokeWidth={2.5} dot={false} isAnimationActive={false} />
                 <Line type="monotone" dataKey="main_tank" name="Main Tank" stroke="#7A63D6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
-                <Brush dataKey="time" height={28} stroke="#1768D1" fill="#E4F0FD" />
+                <Brush dataKey="time" height={18} stroke="#1768D1" fill="#E4F0FD" />
               </LineChart>
             </ResponsiveContainer>
           </Card>
         </div>
       )}
+      </div>
     </div>
   );
 }
