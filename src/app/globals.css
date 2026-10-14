@@ -125,7 +125,7 @@ input[type="time"] {
 /* Compact overview: every live instrument and both charts share the desktop viewport. */
 .dashboard-overview .dashboard-chart-card { height: 230px; }
 .dashboard-overview .dashboard-stats > div { min-width: 0; padding: 12px; }
-.dashboard-overview .dashboard-instrument-card > svg { width: 210px; height: 210px; max-width: 100%; }
+.dashboard-overview .dashboard-instrument-card svg { width: 210px; height: 210px; max-width: 100%; }
 .dashboard-overview .dashboard-tank-card svg { width: 95px; height: 154px; }
 .dashboard-overview .dashboard-tank-card > div.absolute { position: static; align-self: flex-end; }
 @media (min-width: 1024px) {
@@ -135,10 +135,10 @@ input[type="time"] {
   .dashboard-overview .dashboard-trends > div > div:first-child { margin-bottom: 6px; }
   .dashboard-overview .dashboard-instruments h2,
   .dashboard-overview .dashboard-trends h2 { font-size: 13px; }
-  .dashboard-overview .dashboard-instrument-card { min-width: 0; height: 225px; }
-  .dashboard-overview .dashboard-instrument-card > svg { width: 175px; height: 175px; }
+  .dashboard-overview .dashboard-instrument-card { min-width: 0; height: 240px; }
+  .dashboard-overview .dashboard-instrument-card svg { width: 190px; height: 190px; }
   .dashboard-overview .dashboard-instrument-card span { font-size: 11px; }
-  .dashboard-overview .dashboard-tank-card svg { width: 76px; height: 124px; }
+  .dashboard-overview .dashboard-tank-card svg { width: 68px; height: 110px; }
   .dashboard-overview .dashboard-tank-card .text-3xl { font-size: 22px; }
   .dashboard-overview .dashboard-chart-card { height: clamp(145px, 24vh, 220px); }
 }
