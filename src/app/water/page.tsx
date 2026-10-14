@@ -22,7 +22,7 @@ const HISTORY_DAYS = 7;
  * here; move it there if you'd rather keep tank config in one place.
  */
 const CAPACITY_LITERS: Record<string, number> = {
-  main_tank: 5000,
+  main_tank: 10000, // Two connected 5,000 L tanks sharing the measured level.
   pump_house_tank: 3000,
 };
 
