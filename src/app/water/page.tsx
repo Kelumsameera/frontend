@@ -360,7 +360,7 @@ export default function WaterPage() {
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Line type="monotone" dataKey="main_tank" name="Main Tank" stroke="#1768D1" strokeWidth={2.5} dot={false} isAnimationActive={false} />
               <Line type="monotone" dataKey="pump_house_tank" name="Pump House Tank" stroke="#1AA6C9" strokeWidth={2.5} dot={false} isAnimationActive={false} />
-              
+
             </LineChart>
           </ResponsiveContainer>
         </Card>
