@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Brush } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { FaTriangleExclamation } from "react-icons/fa6";
 
 import RoundTank from "@/components/SimpleTank";
@@ -9,17 +9,10 @@ import PressureGauge from "@/components/PressureGauge";
 import StatCard from "@/components/StatCard";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { Card, PageHeader, SectionLabel, StatusPill, pressureStatus, tankPercentStatus, statusLabel, LiveClock } from "@/components/ui";
+import { useRollingTrend } from "@/hooks/useRollingTrend";
 import { useSocket } from "@/hooks/useSocket";
-import type { PressureState, DualTankState, ChartPoint, ModbusUpdate, WaterTankUpdate } from "@/types";
+import type { PressureState, DualTankState, ModbusUpdate, WaterTankUpdate } from "@/types";
 import { FY600_DEVICES } from "@/types";
-
-const MAX_HISTORY = 40;
-
-interface WaterChartPoint {
-  time: string;
-  pump_house_tank: number;
-  main_tank: number;
-}
 
 function percentFromLevel(levelCm: number, maxHeightCm: number) {
   return Math.max(0, Math.min(100, (levelCm / maxHeightCm) * 100));
@@ -33,8 +26,9 @@ export default function DashboardPage() {
 
   const [tanks, setTanks] = useState<DualTankState>({});
 
-  const [history, setHistory] = useState<ChartPoint[]>([]);
-  const [waterHistory, setWaterHistory] = useState<WaterChartPoint[]>([]);
+  const [trendMinutes, setTrendMinutes] = useState(60);
+  const pressureTrend = useRollingTrend("pressure/trend", trendMinutes);
+  const waterTrend = useRollingTrend("water-tank/trend", trendMinutes);
 
   const onModbusUpdate = useCallback((data: ModbusUpdate) => {
     const value = Number(data.value) || 0;
@@ -44,16 +38,8 @@ export default function DashboardPage() {
       [data.device]: value,
     }));
 
-    setHistory((prev) => {
-      const last = prev.at(-1);
-      const next: ChartPoint = {
-        time: new Date().toLocaleTimeString(),
-        production: data.device === "production_clean_room" ? value : (last?.production ?? 0),
-        assembly: data.device === "assembly_clean_room" ? value : (last?.assembly ?? 0),
-      };
-      return [...prev.slice(-(MAX_HISTORY - 1)), next];
-    });
-  }, []);
+    pressureTrend.add(data.device, value);
+  }, [pressureTrend.add]);
 
   const onWaterTankUpdate = useCallback((data: WaterTankUpdate) => {
     const deviceId = data.device || "fy600";
@@ -70,16 +56,8 @@ export default function DashboardPage() {
       },
     }));
 
-    setWaterHistory((prev) => {
-      const last = prev.at(-1);
-      const next: WaterChartPoint = {
-        time: new Date().toLocaleTimeString(),
-        pump_house_tank: deviceId === "pump_house_tank" ? level : (last?.pump_house_tank ?? 0),
-        main_tank: deviceId === "main_tank" ? level : (last?.main_tank ?? 0),
-      };
-      return [...prev.slice(-(MAX_HISTORY - 1)), next];
-    });
-  }, []);
+    if (!data.status || data.status === "ONLINE") waterTrend.add(deviceId, level);
+  }, [waterTrend.add]);
 
   const { status } = useSocket({
     onModbusUpdate,
@@ -167,35 +145,41 @@ export default function DashboardPage() {
       </div>
 
       </div>
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Dashboard trend time range">
+        {[{ minutes: 30, label: "30 minutes" }, { minutes: 60, label: "1 hour" }, { minutes: 360, label: "6 hours" }, { minutes: 1440, label: "24 hours" }].map((range) => (
+          <button key={range.minutes} aria-pressed={trendMinutes === range.minutes} onClick={() => setTrendMinutes(range.minutes)} className="px-3 py-1 rounded-lg border text-xs" style={{ background: trendMinutes === range.minutes ? "var(--primary)" : "var(--panel)", color: trendMinutes === range.minutes ? "white" : "var(--text)" }}>{range.label}</button>
+        ))}
+        {(pressureTrend.loading || waterTrend.loading) && <span role="status" className="text-xs">Loading history…</span>}
+        {(pressureTrend.error || waterTrend.error) && <span role="alert" className="text-xs">History unavailable; showing live readings.</span>}
+      </div>
       <div className="dashboard-trends grid grid-cols-1 lg:grid-cols-2 gap-3">
       {/* Pressure trend chart */}
       <div>
-        <SectionLabel title="Pressure Trend" subtitle={`Last ${MAX_HISTORY} live readings`} />
+        <SectionLabel title="Pressure Trend" subtitle="Historical averages with live updates" />
         <Card className="dashboard-chart-card p-2 lg:p-3">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={history}>
+            <LineChart data={pressureTrend.points}>
               <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
-              <XAxis dataKey="time" tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
+              <XAxis dataKey="time" type="number" scale="time" domain={[pressureTrend.end - trendMinutes * 60000, pressureTrend.end]} tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} tick={{ fontSize: 10, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
               <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
+              <Tooltip labelFormatter={(time) => new Date(Number(time)).toLocaleString()} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="production" name="Production" stroke="#1768D1" strokeWidth={2.5} dot={false} isAnimationActive={false} />
-              <Line type="monotone" dataKey="assembly" name="Assembly" stroke="#7A63D6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
-              <Brush dataKey="time" height={18} stroke="#1768D1" fill="#E4F0FD" />
+              <Line type="monotone" dataKey="production_clean_room" name="Production" stroke="#1768D1" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="assembly_clean_room" name="Assembly" stroke="#7A63D6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         </Card>
       </div>
 
       {/* Water level trend chart */}
-      {waterHistory.length > 0 && (
+      {(
         <div>
-          <SectionLabel title="Water Level Trend" subtitle={`Last ${MAX_HISTORY} live readings`} />
+          <SectionLabel title="Water Level Trend" subtitle="Historical averages with live updates" />
           <Card className="dashboard-chart-card p-2 lg:p-3">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={waterHistory}>
+              <LineChart data={waterTrend.points}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />
-                <XAxis dataKey="time" tick={{ fontSize: 11, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
+                <XAxis dataKey="time" type="number" scale="time" domain={[waterTrend.end - trendMinutes * 60000, waterTrend.end]} tickFormatter={(time) => new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} tick={{ fontSize: 10, fill: "#5C7290" }} axisLine={{ stroke: "#DCE6F2" }} tickLine={false} />
                 <YAxis
                   domain={["auto", "auto"]}
                   tick={{ fontSize: 11, fill: "#5C7290" }}
@@ -203,11 +187,10 @@ export default function DashboardPage() {
                   tickLine={false}
                   label={{ value: "cm", angle: -90, position: "insideLeft", style: { fill: "#5C7290", fontSize: 12 } }}
                 />
-                <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
+                <Tooltip labelFormatter={(time) => new Date(Number(time)).toLocaleString()} contentStyle={{ borderRadius: 10, border: "1px solid #DCE6F2" }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Line type="monotone" dataKey="pump_house_tank" name="Pump House Tank" stroke="#1AA6C9" strokeWidth={2.5} dot={false} isAnimationActive={false} />
                 <Line type="monotone" dataKey="main_tank" name="Main Tank" stroke="#7A63D6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
-                <Brush dataKey="time" height={18} stroke="#1768D1" fill="#E4F0FD" />
               </LineChart>
             </ResponsiveContainer>
           </Card>
