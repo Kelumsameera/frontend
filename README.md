@@ -71,3 +71,22 @@ src/
 - `npm run dev` – development server
 - `npm run build` – production build
 - `npm start` – run production build
+
+## LAN automatic deployment
+
+This installation checks the public `main` branch every minute using the
+Ubuntu `flexicare-auto-deploy.timer` service, then requests a build through
+Coolify's authenticated local API. A successful Git push is enough; no inbound
+GitHub webhook or public router port is required.
+
+GitHub access requires internet. Existing deployed applications continue running
+on the LAN without internet. Failed deployments retry after ten minutes.
+
+Server checks:
+
+```bash
+systemctl status flexicare-auto-deploy.timer
+sudo journalctl -u flexicare-auto-deploy.service -n 30 --no-pager
+```
+
+To pause deployment checks: `sudo systemctl stop flexicare-auto-deploy.timer`.
