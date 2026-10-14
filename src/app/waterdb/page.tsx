@@ -10,7 +10,7 @@ import { Card, PageHeader } from "@/components/ui";
 import type { DateTimeFilter, TableRow } from "@/types";
 import { DEVICE_LABELS, FY600_DEVICES } from "@/types";
 
-const getToday = () => new Date().toISOString().split("T")[0];
+const getToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
 export default function WaterDatabasePage() {
   const [filters, setFilters] = useState<DateTimeFilter>({

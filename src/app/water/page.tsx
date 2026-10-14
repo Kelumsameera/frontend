@@ -6,14 +6,13 @@ import SimpleTank from "@/components/SimpleTank";
 import ConnectionStatus from "@/components/ConnectionStatus";
 import { Card, PageHeader, SectionLabel, StatusPill, tankPercentStatus, LiveClock } from "@/components/ui";
 import { useSocket } from "@/hooks/useSocket";
-import { useWaterConsumption, type LevelReading } from "@/hooks/useWaterConsumption";
-import { fetchWaterHistory, fetchRealtimeWater, fetchWaterTrend } from "@/lib/api";
+import type { WaterConsumptionResult } from "@/hooks/useWaterConsumption";
+import { fetchWaterHistory, fetchRealtimeWater, fetchWaterTrend, fetchWaterConsumption } from "@/lib/api";
 import type { DualTankState, WaterTankUpdate, HistoryRow } from "@/types";
 import { FY600_DEVICES, DEVICE_LABELS } from "@/types";
 
 const TREND_RANGES = [{ minutes: 30, label: "30 minutes" }, { minutes: 60, label: "1 hour" }, { minutes: 360, label: "6 hours" }, { minutes: 1440, label: "24 hours" }];
-const MAX_READINGS = 3000; // raw readings kept per tank for consumption calc
-const HISTORY_DAYS = 7;
+
 
 /**
  * Full-tank volume in liters, keyed by device id — used only to turn a
@@ -52,20 +51,6 @@ function toApiDateTime(d: Date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/** HistoryRow -> LevelReading. HistoryRow's level is in `value`, not `level`. */
-function rowToReading(row: HistoryRow): LevelReading {
-  const t = new Date(row.time).getTime();
-  return { time: Number.isFinite(t) ? t : Date.now(), levelCm: Number(row.value) || 0 };
-}
-
-/** Appends live readings newer than the last historical point, so a socket update that lands mid-fetch doesn't get lost or duplicated. */
-function mergeHistoryAndLive(history: LevelReading[], current: LevelReading[]): LevelReading[] {
-  if (current.length === 0) return history;
-  const lastHistoryTime = history.length ? history[history.length - 1].time : 0;
-  const liveOnly = current.filter((r) => r.time > lastHistoryTime);
-  return [...history, ...liveOnly].slice(-MAX_READINGS);
-}
-
 export default function WaterPage() {
   const [tanks, setTanks] = useState<DualTankState>({});
   const [waterHistory, setWaterHistory] = useState<WaterChartPoint[]>([]);
@@ -74,7 +59,8 @@ export default function WaterPage() {
   const [trendError, setTrendError] = useState<string | null>(null);
   const [trendEnd, setTrendEnd] = useState(Date.now());
   const bucketMs = Math.max(15, trendMinutes * 60 / 120) * 1000;
-  const [readings, setReadings] = useState<Record<string, LevelReading[]>>(Object.fromEntries(FY600_DEVICES.map((d) => [d.id, []])));
+  const [consumptionByDevice, setConsumptionByDevice] = useState<Record<string, WaterConsumptionResult>>({});
+  const [consumptionError, setConsumptionError] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
 
   const onWaterTankUpdate = useCallback((data: WaterTankUpdate) => {
@@ -92,7 +78,7 @@ export default function WaterPage() {
       },
     }));
 
-    if (deviceId === "main_tank" || deviceId === "pump_house_tank") {
+    if ((!data.status || data.status === "ONLINE") && (deviceId === "main_tank" || deviceId === "pump_house_tank")) {
       const now = Date.now();
       const time = Math.floor(now / bucketMs) * bucketMs;
       setTrendEnd(now);
@@ -107,10 +93,6 @@ export default function WaterPage() {
       });
     }
 
-    setReadings((prev) => ({
-      ...prev,
-      [deviceId]: [...(prev[deviceId] ?? []).slice(-(MAX_READINGS - 1)), { time: Date.now(), levelCm: level }],
-    }));
   }, [bucketMs, trendMinutes]);
 
   const { status } = useSocket({ onWaterTankUpdate });
@@ -159,28 +141,18 @@ export default function WaterPage() {
     return () => { cancelled = true; clearInterval(timer); };
   }, [trendMinutes, bucketMs]);
 
-  // Seed 7 days of DB history (for the consumption stats/charts) and the
-  // current level (so tanks don't sit empty while waiting for the first
-  // socket push) as soon as the page loads.
+  // Aggregate complete database history; do not truncate raw samples in the browser.
   useEffect(() => {
     let cancelled = false;
-
     async function loadHistory() {
-      const end = new Date();
-      const start = new Date(end.getTime() - HISTORY_DAYS * 24 * 60 * 60 * 1000);
-
       try {
-        const results = await Promise.all(FY600_DEVICES.map((d) => fetchWaterHistory(toApiDateTime(start), toApiDateTime(end), d.id)));
-        if (cancelled) return;
-        setReadings((prev) => {
-          const next = { ...prev };
-          FY600_DEVICES.forEach((d, i) => {
-            next[d.id] = mergeHistoryAndLive(results[i].map(rowToReading), prev[d.id] ?? []);
-          });
-          return next;
-        });
-      } catch (err) {
-        console.error("Failed to load water history:", err);
+        const values = await Promise.all(FY600_DEVICES.map((d) => fetchWaterConsumption(d.id, d.maxHeightCm)));
+        if (!cancelled) {
+          setConsumptionByDevice(Object.fromEntries(FY600_DEVICES.map((d, i) => [d.id, values[i]])));
+          setConsumptionError(null);
+        }
+      } catch {
+        if (!cancelled) setConsumptionError("Consumption history unavailable. Previously loaded totals may be out of date.");
       } finally {
         if (!cancelled) setHistoryLoading(false);
       }
@@ -209,51 +181,38 @@ export default function WaterPage() {
 
     loadHistory();
     loadRealtime();
+    const refresh = setInterval(loadHistory, 60000);
     return () => {
+      clearInterval(refresh);
       cancelled = true;
     };
   }, []);
 
-  // Consumption per tank, derived from the combined history + live readings.
-  // Called explicitly (not inside FY600_DEVICES.map) to respect the rules of hooks.
-  const mainCfg = FY600_DEVICES.find((d) => d.id === "main_tank");
-  const pumpCfg = FY600_DEVICES.find((d) => d.id === "pump_house_tank");
-  const mainConsumption = useWaterConsumption(readings["main_tank"] ?? [], {
-    maxHeightCm: mainCfg?.maxHeightCm ?? 250,
-  });
-  const pumpConsumption = useWaterConsumption(readings["pump_house_tank"] ?? [], {
-    maxHeightCm: pumpCfg?.maxHeightCm ?? 250,
-  });
-  const consumptionByDevice: Record<string, ReturnType<typeof useWaterConsumption>> = {
-    main_tank: mainConsumption,
-    pump_house_tank: pumpConsumption,
-  };
-
   const todayLiters = FY600_DEVICES.reduce((a, d) => {
     const value = consumptionByDevice[d.id];
-    return a + litersFromCm(value.todayUsedCm, d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
+    return a + litersFromCm((value?.todayUsedCm ?? 0), d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
   }, 0);
   const last7DaysLiters = FY600_DEVICES.reduce((a, d) => {
     const value = consumptionByDevice[d.id];
-    return a + litersFromCm(value.last7DaysUsedCm, d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
+    return a + litersFromCm((value?.last7DaysUsedCm ?? 0), d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
   }, 0);
   const avgDailyLiters = FY600_DEVICES.reduce((a, d) => {
     const value = consumptionByDevice[d.id];
-    return a + litersFromCm(value.avgDailyUsedCm, d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
+    return a + litersFromCm((value?.avgDailyUsedCm ?? 0), d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
   }, 0);
 
   const firstDevice = FY600_DEVICES[0].id;
-  const recentChart = consumptionByDevice[firstDevice].recent.map((point, i) => {
+  const recentChart = (consumptionByDevice[firstDevice]?.recent ?? []).map((point, i) => {
     const row: Record<string, string | number> = { label: point.label };
     FY600_DEVICES.forEach((d) => {
-      const value = consumptionByDevice[d.id].recent[i];
+      const value = consumptionByDevice[d.id]?.recent[i];
       row[d.id] = litersFromCm(value?.cm ?? 0, d.maxHeightCm, CAPACITY_LITERS[d.id] ?? 0);
     });
     return row;
   });
 
   // ── DB History chart state ───────────────────────────────
-  const getToday = () => new Date().toISOString().split("T")[0];
+  const getToday = () => toApiDateTime(new Date()).split(" ")[0];
   const [historyStartDate, setHistoryStartDate] = useState(getToday());
   const [historyStartTime, setHistoryStartTime] = useState("00:00");
   const [historyEndDate, setHistoryEndDate] = useState(getToday());
@@ -319,7 +278,7 @@ export default function WaterPage() {
           return (
             <Card key={device.id} className="p-6 flex flex-col items-center relative">
               <div className="absolute top-5 right-5">
-                <StatusPill status={tankPercentStatus(percent)} />
+                {tankData?.status && tankData.status !== "ONLINE" ? <span className="text-xs font-semibold text-amber-700">{tankData.status} · last known level</span> : <StatusPill status={tankPercentStatus(percent)} />}
               </div>
               <SimpleTank levelCm={tankData?.level ?? 0} setpoint={tankData?.setpoint ?? 0} output={tankData?.output ?? 0} label={device.label} maxHeightCm={device.maxHeightCm} />
               <p className="mt-3 text-xs text-(--text-faint) font-mono-data">
@@ -368,26 +327,27 @@ export default function WaterPage() {
 
       {/* Consumption KPI cards */}
       <div className="mb-4">
-        <SectionLabel title="Water Consumption" subtitle="Derived from level drops · both tanks combined" />
+        <SectionLabel title="Water Consumption" subtitle="Estimated from stored level drops · both tanks · refreshes every minute" />
+        {consumptionError && <p role="alert" className="text-sm mb-3">{consumptionError}</p>}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="p-5">
             <p className="text-sm text-(--text-muted)">Used today</p>
             <p className="mt-2 font-mono-data text-3xl font-bold text-(--text)">
-              {historyLoading ? "…" : Math.round(todayLiters)}
+              {historyLoading ? "…" : Object.keys(consumptionByDevice).length === 0 ? "—" : Math.round(todayLiters)}
               <span className="ml-1 text-sm font-normal text-(--text-muted)">L</span>
             </p>
           </Card>
           <Card className="p-5">
             <p className="text-sm text-(--text-muted)">Last 7 days</p>
             <p className="mt-2 font-mono-data text-3xl font-bold text-(--text)">
-              {historyLoading ? "…" : Math.round(last7DaysLiters)}
+              {historyLoading ? "…" : Object.keys(consumptionByDevice).length === 0 ? "—" : Math.round(last7DaysLiters)}
               <span className="ml-1 text-sm font-normal text-(--text-muted)">L</span>
             </p>
           </Card>
           <Card className="p-5">
             <p className="text-sm text-(--text-muted)">Average / day</p>
             <p className="mt-2 font-mono-data text-3xl font-bold text-(--text)">
-              {historyLoading ? "…" : Math.round(avgDailyLiters)}
+              {historyLoading ? "…" : Object.keys(consumptionByDevice).length === 0 ? "—" : Math.round(avgDailyLiters)}
               <span className="ml-1 text-sm font-normal text-(--text-muted)">L</span>
             </p>
           </Card>
@@ -396,7 +356,7 @@ export default function WaterPage() {
 
       {/* Recent (hourly) consumption */}
       <Card className="p-4 lg:p-6 mb-10">
-        <SectionLabel title="Recent consumption" subtitle="Liters used per hour, both tanks" />
+        <SectionLabel title="Recent consumption" subtitle="Estimated liters used per hour · last 12 hours" />
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={recentChart}>
             <CartesianGrid strokeDasharray="3 3" stroke="#DCE6F2" opacity={0.8} vertical={false} />

@@ -54,3 +54,9 @@ export async function fetchWaterTrend(minutes: number): Promise<HistoryRow[]> {
   if (!res.ok) throw new Error("Failed to fetch water trend");
   return res.json();
 }
+
+export async function fetchWaterConsumption(device: string, maxHeight: number): Promise<import("@/hooks/useWaterConsumption").WaterConsumptionResult> {
+  const res = await fetch(`${API_URL}/water-tank/consumption?device=${encodeURIComponent(device)}&max_height=${maxHeight}`);
+  if (!res.ok) throw new Error("Failed to fetch water consumption");
+  return res.json();
+}
